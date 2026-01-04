@@ -8,8 +8,12 @@ interface ScrollableTermsProps {
 
 export function ScrollableTerms({ content, onScrolledToBottom }: ScrollableTermsProps) {
   const containerRef = useRef<HTMLDivElement>(null);
+  const hasReachedBottomRef = useRef(false);
 
   const checkScroll = useCallback(() => {
+    // Once they've reached bottom, don't require scrolling again
+    if (hasReachedBottomRef.current) return;
+
     const container = containerRef.current;
     if (!container) return;
 
@@ -17,7 +21,10 @@ export function ScrollableTerms({ content, onScrolledToBottom }: ScrollableTerms
     const isAtBottom =
       container.scrollHeight - container.scrollTop - container.clientHeight < 20;
 
-    onScrolledToBottom(isAtBottom);
+    if (isAtBottom) {
+      hasReachedBottomRef.current = true;
+      onScrolledToBottom(true);
+    }
   }, [onScrolledToBottom]);
 
   useEffect(() => {

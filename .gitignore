@@ -9,3 +9,5 @@ CLAUDE.md
 .env
 .env.local
 .env.*.local
+
+.venv
