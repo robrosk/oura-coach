@@ -1,2 +1,11 @@
+# Claude
 .claude
 CLAUDE.md
+
+# macOS
+.DS_Store
+
+# Environment
+.env
+.env.local
+.env.*.local
