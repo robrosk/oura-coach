@@ -80,7 +80,7 @@ export function Header() {
 
   return (
     <header className="bg-surface border-b border-border">
-      <nav className="max-w-4xl mx-auto px-4 py-4">
+      <nav className="w-full px-4 md:px-6 py-4">
         <div className="flex items-center justify-between">
           {/* Logo */}
           <Link
@@ -118,16 +118,16 @@ export function Header() {
                     <img
                       src={user.picture}
                       alt={user.name || 'Profile'}
-                      className="w-6 h-6 rounded-full"
+                      className="w-8 h-8 rounded-full"
                     />
                   ) : (
-                    <div className="w-6 h-6 rounded-full bg-accent/20 flex items-center justify-center">
-                      <span className="text-xs text-accent font-medium">
+                    <div className="w-8 h-8 rounded-full bg-accent/20 flex items-center justify-center">
+                      <span className="text-sm text-accent font-medium">
                         {user?.email?.[0]?.toUpperCase() || '?'}
                       </span>
                     </div>
                   )}
-                  <SettingsIcon className="w-[18px] h-[18px]" />
+                  <SettingsIcon className="w-6 h-6" />
                 </button>
 
                 {/* Dropdown menu */}
@@ -184,10 +184,10 @@ export function Header() {
                     <img
                       src={user.picture}
                       alt={user.name || 'Profile'}
-                      className="w-6 h-6 rounded-full"
+                      className="w-9 h-9 rounded-full"
                     />
                   ) : (
-                    <SettingsIcon className="w-6 h-6" />
+                    <SettingsIcon className="w-8 h-8" />
                   )}
                 </button>
 
