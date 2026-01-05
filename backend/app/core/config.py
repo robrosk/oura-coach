@@ -6,12 +6,24 @@ from pathlib import Path
 from pydantic_settings import BaseSettings
 
 
+def _find_env_file() -> str:
+    """Find .env file - works both locally and in Docker."""
+    # Docker: /app/.env (mounted)
+    docker_path = Path("/app/.env")
+    if docker_path.exists():
+        return str(docker_path)
+
+    # Local dev: project root .env (4 levels up from this file)
+    local_path = Path(__file__).parent.parent.parent.parent / ".env"
+    return str(local_path)
+
+
 class Settings(BaseSettings):
     """Application settings loaded from environment variables."""
 
     # Oura OAuth
-    oura_client_id: str
-    oura_client_secret: str
+    oura_client_id: str = ""
+    oura_client_secret: str = ""
     oura_redirect_uri: str = "http://localhost:8000/oura/callback"
     oura_scopes: str = "daily personal"
 
@@ -46,7 +58,7 @@ class Settings(BaseSettings):
     jwt_expire_hours: int = 24
 
     model_config = {
-        "env_file": str(Path(__file__).parent.parent.parent.parent / ".env"),
+        "env_file": _find_env_file(),
         "env_file_encoding": "utf-8",
         "extra": "ignore",
     }

@@ -20,4 +20,4 @@ python-dotenv>=1.0
 # Optional: Background scheduler (only needed if ENABLE_SCHEDULER=true)
 apscheduler>=3.10.0
 
-jwt
+PyJWT>=2.8.0
