@@ -10,4 +10,12 @@ CLAUDE.md
 .env.local
 .env.*.local
 
+# Python
 .venv
+__pycache__
+*.pyc
+*.pyo
+
+# SQLite
+*.db
+*.sqlite
