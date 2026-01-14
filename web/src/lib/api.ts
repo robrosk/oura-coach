@@ -1,4 +1,12 @@
-import type { OAuthStartResponse, OuraStatus, OuraRawResponse, User, GoogleAuthStartResponse } from '../types';
+import type {
+  OAuthStartResponse,
+  OuraStatus,
+  OuraRawResponse,
+  User,
+  GoogleAuthStartResponse,
+  ChatMessage,
+  ChatResponse,
+} from '../types';
 import { getStoredToken } from './auth';
 
 const BACKEND_BASE_URL = import.meta.env.VITE_BACKEND_BASE_URL || 'http://localhost:8000';
@@ -143,6 +151,32 @@ export async function disconnectOura(): Promise<{ success: boolean; message: str
       throw new Error('Authentication required');
     }
     throw new Error(`Failed to disconnect: ${response.status} ${response.statusText}`);
+  }
+
+  return response.json();
+}
+
+// =============================================================================
+// Agent Chat API
+// =============================================================================
+
+/**
+ * Send a chat message to the backend agent
+ */
+export async function sendChatMessage(
+  message: string,
+  history: ChatMessage[] = []
+): Promise<ChatResponse> {
+  const response = await authFetch(`${BACKEND_BASE_URL}/agent/chat`, {
+    method: 'POST',
+    body: JSON.stringify({ message, history }),
+  });
+
+  if (!response.ok) {
+    if (response.status === 401) {
+      throw new Error('Authentication required');
+    }
+    throw new Error(`Failed to send message: ${response.status} ${response.statusText}`);
   }
 
   return response.json();

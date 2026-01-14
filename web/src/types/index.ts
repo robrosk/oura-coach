@@ -10,6 +10,26 @@ export interface OAuthStartResponse {
   state?: string;
 }
 
+export interface ChatMessage {
+  role: 'user' | 'assistant';
+  content: string;
+}
+
+export interface ToolCall {
+  name: string;
+  args: Record<string, unknown>;
+  resolved_range?: {
+    days?: number;
+    start_date?: string;
+    end_date?: string;
+  };
+}
+
+export interface ChatResponse {
+  reply: string;
+  tool_calls?: ToolCall[];
+}
+
 // Re-export Oura types
 export * from './oura';
 

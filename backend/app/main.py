@@ -6,6 +6,7 @@ from typing import Optional
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from .api.routes_agent import router as agent_router
 from .api.routes_auth import router as auth_router
 from .api.routes_oura import router as oura_router
 from .core.config import get_settings
@@ -158,6 +159,7 @@ app.add_middleware(
 # Include routers
 app.include_router(auth_router)
 app.include_router(oura_router)
+app.include_router(agent_router)
 
 
 @app.get("/")

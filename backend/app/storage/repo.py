@@ -317,6 +317,31 @@ def get_raw_events(
     return list(db.execute(query).scalars().all())
 
 
+def get_raw_events_by_range(
+    db: Session,
+    user_id: str,
+    endpoint: str,
+    start_day: str,
+    end_day: str,
+    limit: int = 1000,
+) -> list[OuraRawEvent]:
+    """Get raw events for a user/endpoint within a date range (by day field)."""
+    query = (
+        select(OuraRawEvent)
+        .where(
+            OuraRawEvent.user_id == user_id,
+            OuraRawEvent.endpoint == endpoint,
+            OuraRawEvent.day.isnot(None),
+            OuraRawEvent.day >= start_day,
+            OuraRawEvent.day <= end_day,
+        )
+        .order_by(OuraRawEvent.day.desc())
+        .limit(limit)
+    )
+
+    return list(db.execute(query).scalars().all())
+
+
 def count_raw_events_by_endpoint(db: Session, user_id: str) -> dict[str, int]:
     """Count raw events grouped by endpoint for a user."""
     from sqlalchemy import func

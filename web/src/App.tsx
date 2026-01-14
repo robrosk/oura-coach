@@ -14,6 +14,7 @@ import { Connect } from './pages/app/Connect';
 import { Welcome } from './pages/app/Welcome';
 import { Insights } from './pages/app/Insights';
 import { MetricDetail } from './pages/app/MetricDetail';
+import { Chat } from './pages/app/Chat';
 
 function App() {
   return (
@@ -75,6 +76,16 @@ function App() {
               <AuthGate>
                 <TermsGate>
                   <MetricDetail />
+                </TermsGate>
+              </AuthGate>
+            }
+          />
+          <Route
+            path="/app/chat"
+            element={
+              <AuthGate>
+                <TermsGate>
+                  <Chat />
                 </TermsGate>
               </AuthGate>
             }

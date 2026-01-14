@@ -57,6 +57,9 @@ class Settings(BaseSettings):
     jwt_algorithm: str = "HS256"
     jwt_expire_hours: int = 24
 
+    # OpenAI
+    openai_api_key: str = ""
+
     model_config = {
         "env_file": _find_env_file(),
         "env_file_encoding": "utf-8",

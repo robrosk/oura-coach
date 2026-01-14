@@ -136,3 +136,33 @@ input[type="checkbox"] {
   color: var(--color-text-secondary);
   font-style: italic;
 }
+
+/* Chat markdown styling (compact for bubbles) */
+.chat-markdown p {
+  margin: 0;
+}
+
+.chat-markdown p + p {
+  margin-top: 0.75rem;
+}
+
+.chat-markdown ul,
+.chat-markdown ol {
+  margin: 0.5rem 0 0.5rem 1.25rem;
+  padding-left: 0;
+}
+
+.chat-markdown li {
+  margin-bottom: 0.25rem;
+}
+
+.chat-markdown code {
+  background-color: var(--color-surface);
+  padding: 0.1rem 0.3rem;
+  border-radius: 0.25rem;
+  font-size: 0.85rem;
+}
+
+.chat-markdown .katex {
+  font-size: 0.95em;
+}

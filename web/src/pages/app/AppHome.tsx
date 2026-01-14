@@ -162,31 +162,35 @@ export function AppHome() {
           </div>
         )}
 
-        {/* Experiments card - Coming soon */}
-        {isConnected ? (
-          <div className="bg-surface border border-border rounded-lg p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <h3 className="font-semibold mb-1 text-text-primary">
-                  Experiments
-                </h3>
-                <p className="text-sm text-text-muted">
-                  Coming soon
-                </p>
-              </div>
-              <span className="text-xs bg-surface-elevated text-text-muted px-2 py-1 rounded">
-                Soon
-              </span>
+        {/* Chat card */}
+        <Link
+          to="/app/chat"
+          className="bg-surface border border-border rounded-lg p-4 hover:border-accent transition-colors group"
+        >
+          <div className="flex items-center justify-between">
+            <div>
+              <h3 className="font-semibold mb-1 text-text-primary group-hover:text-accent transition-colors">
+                Chat with Oura Coach
+              </h3>
+              <p className="text-sm text-text-secondary">
+                Ask questions and get non-medical experiment ideas
+              </p>
             </div>
+            <svg
+              className="w-5 h-5 text-text-muted group-hover:text-accent transition-colors"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M9 5l7 7-7 7"
+              />
+            </svg>
           </div>
-        ) : (
-          <div className="bg-surface-elevated border border-border rounded-lg p-4 opacity-50 cursor-not-allowed">
-            <h3 className="font-semibold mb-1 text-text-primary">Experiments</h3>
-            <p className="text-sm text-text-muted">
-              Connect Oura first
-            </p>
-          </div>
-        )}
+        </Link>
       </div>
 
       {/* Disclaimer */}
