@@ -3,7 +3,7 @@
 import uuid
 from datetime import datetime
 
-from sqlalchemy import Column, DateTime, ForeignKey, Index, String, Text, UniqueConstraint
+from sqlalchemy import Column, DateTime, ForeignKey, Index, Integer, String, Text, UniqueConstraint
 from sqlalchemy.orm import DeclarativeBase, relationship
 
 
@@ -34,6 +34,7 @@ class User(Base):
     # Relationships
     oauth_token = relationship("OuraOAuthToken", back_populates="user", uselist=False, cascade="all, delete-orphan")
     raw_events = relationship("OuraRawEvent", back_populates="user", cascade="all, delete-orphan")
+    experiments = relationship("Experiment", back_populates="user", cascade="all, delete-orphan")
 
 
 class OuraOAuthToken(Base):
@@ -79,4 +80,33 @@ class OuraRawEvent(Base):
         Index("idx_raw_events_user_endpoint", "user_id", "endpoint"),
         Index("idx_raw_events_fetched_at", "fetched_at"),
         Index("idx_raw_events_day", "day"),
+    )
+
+
+class Experiment(Base):
+    """User-defined wellness experiments."""
+
+    __tablename__ = "experiments"
+
+    id = Column(String(36), primary_key=True, default=generate_uuid)
+    user_id = Column(String(36), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    title = Column(String(255), nullable=False)
+    objective = Column(Text, nullable=False)
+    hypothesis = Column(Text, nullable=False)
+    protocol = Column(Text, nullable=False)
+    duration_days = Column(Integer, nullable=False)
+    start_date = Column(String(10), nullable=False)
+    end_date = Column(String(10), nullable=False)
+    status = Column(String(30), nullable=False, default="active")
+    success_criteria = Column(Text, nullable=False)
+    metrics = Column(Text, nullable=True)
+    outcome = Column(Text, nullable=True)
+    created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+    updated_at = Column(DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    user = relationship("User", back_populates="experiments")
+
+    __table_args__ = (
+        Index("idx_experiments_user", "user_id"),
+        Index("idx_experiments_status", "status"),
     )

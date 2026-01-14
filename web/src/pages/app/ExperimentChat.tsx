@@ -1,16 +1,15 @@
 import { useEffect, useRef, useState, type FormEvent, type KeyboardEvent } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useParams } from 'react-router-dom';
 import ReactMarkdown from 'react-markdown';
 import remarkMath from 'remark-math';
 import rehypeKatex from 'rehype-katex';
 import 'katex/dist/katex.min.css';
-import { streamChatMessage } from '../../lib/api';
-import type { ChatMessage, ToolCall } from '../../types';
+import { getExperiment, streamExperimentChat } from '../../lib/api';
+import type { ChatMessage, Experiment, ToolCall } from '../../types';
 
 const STARTER_MESSAGE: ChatMessage = {
   role: 'assistant',
-  content:
-    "Hi, I'm Oura Coach. Ask me about your sleep, readiness, or activity habits. I can suggest non-medical experiments you can try.",
+  content: "I'm here to coach you through this experiment. How has it been going so far?",
 };
 
 const TOOL_LABELS: Record<string, string> = {
@@ -18,6 +17,9 @@ const TOOL_LABELS: Record<string, string> = {
   get_sleep_data: 'Sleep data',
   get_activity_data: 'Activity data',
   create_experiment: 'Create experiment',
+  end_experiment: 'End experiment',
+  experiment_success: 'Mark success',
+  experiment_failure: 'Mark failure',
   web_search: 'Web search',
   pubmed_search: 'PubMed search',
   web_fetch: 'Web fetch',
@@ -61,6 +63,27 @@ const TOOL_STYLES: Record<
     bg: 'bg-accent/10',
     spinner: 'border-accent',
     badge: 'bg-accent/20 text-accent',
+  },
+  end_experiment: {
+    accent: 'text-text-primary',
+    border: 'border-border',
+    bg: 'bg-surface-elevated',
+    spinner: 'border-text-secondary',
+    badge: 'bg-surface text-text-secondary',
+  },
+  experiment_success: {
+    accent: 'text-success',
+    border: 'border-success/30',
+    bg: 'bg-success/10',
+    spinner: 'border-success',
+    badge: 'bg-success/20 text-success',
+  },
+  experiment_failure: {
+    accent: 'text-error',
+    border: 'border-error/30',
+    bg: 'bg-error/10',
+    spinner: 'border-error',
+    badge: 'bg-error/20 text-error',
   },
   web_search: {
     accent: 'text-text-secondary',
@@ -144,7 +167,57 @@ function formatArgs(tool: ToolCall): string {
   return JSON.stringify(args, null, 2);
 }
 
-export function Chat() {
+function renderExperimentMeta(experiment: Experiment) {
+  return (
+    <div className="bg-surface border border-border rounded-lg p-5 mb-6">
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <h1 className="text-2xl md:text-3xl font-bold text-text-primary">
+            {experiment.title}
+          </h1>
+          <p className="text-text-secondary mt-1">{experiment.objective}</p>
+          <p className="text-xs text-text-muted mt-2">
+            {experiment.start_date} to {experiment.end_date} · {experiment.duration_days} days
+          </p>
+        </div>
+        <span className="text-xs font-semibold px-3 py-1 rounded-full bg-surface-elevated text-text-secondary">
+          {experiment.status}
+        </span>
+      </div>
+      <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4 text-sm text-text-secondary">
+        <div>
+          <p className="text-xs uppercase tracking-wide text-text-muted mb-1">Hypothesis</p>
+          <p>{experiment.hypothesis}</p>
+        </div>
+        <div>
+          <p className="text-xs uppercase tracking-wide text-text-muted mb-1">Success Criteria</p>
+          <p>{experiment.success_criteria}</p>
+        </div>
+        <div>
+          <p className="text-xs uppercase tracking-wide text-text-muted mb-1">Protocol</p>
+          <p>{experiment.protocol}</p>
+        </div>
+        <div>
+          <p className="text-xs uppercase tracking-wide text-text-muted mb-1">Metrics</p>
+          <p>{experiment.metrics.length ? experiment.metrics.join(', ') : 'Not specified'}</p>
+        </div>
+      </div>
+      {experiment.outcome && (
+        <div className="mt-4 text-sm text-text-secondary">
+          <p className="text-xs uppercase tracking-wide text-text-muted mb-1">Outcome</p>
+          <p>{experiment.outcome}</p>
+        </div>
+      )}
+    </div>
+  );
+}
+
+export function ExperimentChat() {
+  const { experimentId } = useParams();
+  const [experiment, setExperiment] = useState<Experiment | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [chatError, setChatError] = useState<string | null>(null);
   const [history, setHistory] = useState<ChatMessage[]>([STARTER_MESSAGE]);
   const [items, setItems] = useState<ChatItem[]>([
     {
@@ -156,14 +229,25 @@ export function Chat() {
   ]);
   const [input, setInput] = useState('');
   const [isSending, setIsSending] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const endRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    if (!experimentId) return;
+    getExperiment(experimentId)
+      .then((response) => setExperiment(response))
+      .catch((err) => {
+        console.error('Failed to load experiment:', err);
+        setLoadError('Unable to load experiment details.');
+      })
+      .finally(() => setLoading(false));
+  }, [experimentId]);
 
   useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [items, isSending]);
 
   const submitMessage = async () => {
+    if (!experimentId) return;
     const trimmed = input.trim();
     if (!trimmed || isSending) return;
 
@@ -188,7 +272,7 @@ export function Chat() {
     setHistory((prev) => [...prev, userMessage]);
     setInput('');
     setIsSending(true);
-    setError(null);
+    setChatError(null);
 
     let replyBuffer = '';
     let hasToken = false;
@@ -218,7 +302,7 @@ export function Chat() {
     };
 
     try {
-      for await (const event of streamChatMessage(trimmed, priorHistory)) {
+      for await (const event of streamExperimentChat(experimentId, trimmed, priorHistory)) {
         if (event.type === 'tool_start') {
           sawToolEvents = true;
           if (assistantPresent && !hasToken) {
@@ -308,8 +392,8 @@ export function Chat() {
         }
       }
     } catch (err) {
-      console.error('Chat request failed:', err);
-      setError('Failed to reach Oura Coach. Please try again.');
+      console.error('Experiment chat failed:', err);
+      setChatError('Failed to reach Oura Coach. Please try again.');
       setItems((prev) => {
         if (!hasToken) {
           const filtered = prev.filter((item) => item.id !== assistantId);
@@ -336,29 +420,49 @@ export function Chat() {
     }
   };
 
+  if (loading) {
+    return (
+      <div className="max-w-3xl mx-auto px-4 py-8">
+        <div className="bg-surface border border-border rounded-lg p-4 flex items-center gap-3">
+          <div className="w-5 h-5 border-2 border-accent border-t-transparent rounded-full animate-spin" />
+          <span className="text-text-secondary">Loading experiment...</span>
+        </div>
+      </div>
+    );
+  }
+
+  if (loadError || !experiment) {
+    return (
+      <div className="max-w-3xl mx-auto px-4 py-8">
+        <Link
+          to="/app/experiments"
+          className="inline-flex items-center gap-2 text-text-secondary hover:text-text-primary transition-colors mb-6"
+        >
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+          </svg>
+          Back to Experiments
+        </Link>
+        <div className="bg-error/10 border border-error/30 rounded-lg p-4 text-sm text-error">
+          {loadError || 'Experiment not found.'}
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="max-w-3xl mx-auto px-4 py-8">
       <Link
-        to="/app"
+        to="/app/experiments"
         className="inline-flex items-center gap-2 text-text-secondary hover:text-text-primary transition-colors mb-6"
       >
         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth={2}
-            d="M15 19l-7-7 7-7"
-          />
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
         </svg>
-        Back to Home
+        Back to Experiments
       </Link>
 
-      <h1 className="text-2xl md:text-3xl font-bold mb-2 text-text-primary">
-        Chat with Oura Coach
-      </h1>
-      <p className="text-text-secondary mb-6">
-        Ask questions, explore patterns, or get non-medical experiment ideas.
-      </p>
+      {renderExperimentMeta(experiment)}
 
       <div className="bg-surface border border-border rounded-lg p-4">
         <div className="max-h-[60vh] min-h-[260px] overflow-y-auto space-y-4 pr-1">
@@ -454,9 +558,9 @@ export function Chat() {
         </div>
       </div>
 
-      {error && (
+      {chatError && (
         <div className="mt-4 bg-error/10 border border-error/30 rounded-lg p-3">
-          <p className="text-sm text-error">{error}</p>
+          <p className="text-sm text-error">{chatError}</p>
         </div>
       )}
 
@@ -465,7 +569,7 @@ export function Chat() {
           value={input}
           onChange={(event) => setInput(event.target.value)}
           onKeyDown={handleKeyDown}
-          placeholder="Ask about sleep, readiness, activity, or habits..."
+          placeholder="Share progress or ask for guidance..."
           rows={2}
           className="w-full rounded-lg border border-border bg-surface-elevated px-4 py-3 text-sm text-text-primary placeholder:text-text-muted focus:border-accent"
         />

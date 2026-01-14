@@ -8,6 +8,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from .api.routes_agent import router as agent_router
 from .api.routes_auth import router as auth_router
+from .api.routes_experiments import router as experiments_router
 from .api.routes_oura import router as oura_router
 from .core.config import get_settings
 from .core.logging import logger
@@ -160,6 +161,7 @@ app.add_middleware(
 app.include_router(auth_router)
 app.include_router(oura_router)
 app.include_router(agent_router)
+app.include_router(experiments_router)
 
 
 @app.get("/")

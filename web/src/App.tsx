@@ -15,6 +15,8 @@ import { Welcome } from './pages/app/Welcome';
 import { Insights } from './pages/app/Insights';
 import { MetricDetail } from './pages/app/MetricDetail';
 import { Chat } from './pages/app/Chat';
+import { Experiments } from './pages/app/Experiments';
+import { ExperimentChat } from './pages/app/ExperimentChat';
 
 function App() {
   return (
@@ -86,6 +88,26 @@ function App() {
               <AuthGate>
                 <TermsGate>
                   <Chat />
+                </TermsGate>
+              </AuthGate>
+            }
+          />
+          <Route
+            path="/app/experiments"
+            element={
+              <AuthGate>
+                <TermsGate>
+                  <Experiments />
+                </TermsGate>
+              </AuthGate>
+            }
+          />
+          <Route
+            path="/app/experiments/:experimentId"
+            element={
+              <AuthGate>
+                <TermsGate>
+                  <ExperimentChat />
                 </TermsGate>
               </AuthGate>
             }

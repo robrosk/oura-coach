@@ -10,7 +10,7 @@ from sqlalchemy.orm import Session
 
 from ..core.config import get_settings
 from ..core.logging import logger
-from .models import OuraOAuthToken, OuraRawEvent, User
+from .models import Experiment, OuraOAuthToken, OuraRawEvent, User
 
 settings = get_settings()
 
@@ -440,3 +440,82 @@ def get_cache_summary(db: Session, user_id: str) -> dict:
         "total_count": total_count,
         "endpoints": endpoints,
     }
+
+
+# =============================================================================
+# Experiments Repository
+# =============================================================================
+
+
+def create_experiment(
+    db: Session,
+    user_id: str,
+    title: str,
+    objective: str,
+    hypothesis: str,
+    protocol: str,
+    duration_days: int,
+    start_date: str,
+    end_date: str,
+    success_criteria: str,
+    metrics: str | None = None,
+) -> Experiment:
+    """Create a new experiment for a user."""
+    experiment = Experiment(
+        user_id=user_id,
+        title=title,
+        objective=objective,
+        hypothesis=hypothesis,
+        protocol=protocol,
+        duration_days=duration_days,
+        start_date=start_date,
+        end_date=end_date,
+        success_criteria=success_criteria,
+        metrics=metrics,
+        status="active",
+    )
+    db.add(experiment)
+    db.commit()
+    db.refresh(experiment)
+    return experiment
+
+
+def list_experiments(db: Session, user_id: str) -> list[Experiment]:
+    """List experiments for a user (newest first)."""
+    query = (
+        select(Experiment)
+        .where(Experiment.user_id == user_id)
+        .order_by(Experiment.created_at.desc())
+    )
+    return list(db.execute(query).scalars().all())
+
+
+def get_experiment(db: Session, user_id: str, experiment_id: str) -> Experiment | None:
+    """Fetch a single experiment by id for a user."""
+    return db.execute(
+        select(Experiment).where(
+            Experiment.user_id == user_id,
+            Experiment.id == experiment_id,
+        )
+    ).scalar_one_or_none()
+
+
+def update_experiment_status(
+    db: Session,
+    user_id: str,
+    experiment_id: str,
+    status: str,
+    outcome: str | None = None,
+) -> Experiment | None:
+    """Update experiment status and optional outcome."""
+    experiment = get_experiment(db, user_id, experiment_id)
+    if not experiment:
+        return None
+
+    experiment.status = status
+    if outcome:
+        experiment.outcome = outcome
+    experiment.updated_at = datetime.utcnow()
+    db.commit()
+    db.refresh(experiment)
+    return experiment

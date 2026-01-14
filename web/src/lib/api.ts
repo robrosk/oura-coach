@@ -6,6 +6,9 @@ import type {
   GoogleAuthStartResponse,
   ChatMessage,
   ChatResponse,
+  ChatStreamEvent,
+  Experiment,
+  ExperimentListResponse,
 } from '../types';
 import { getStoredToken } from './auth';
 
@@ -180,4 +183,150 @@ export async function sendChatMessage(
   }
 
   return response.json();
+}
+
+/**
+ * Stream a chat response from the backend agent as NDJSON events.
+ */
+export async function* streamChatMessage(
+  message: string,
+  history: ChatMessage[] = []
+): AsyncGenerator<ChatStreamEvent> {
+  const response = await authFetch(`${BACKEND_BASE_URL}/agent/chat/stream`, {
+    method: 'POST',
+    body: JSON.stringify({ message, history }),
+  });
+
+  if (!response.ok) {
+    if (response.status === 401) {
+      throw new Error('Authentication required');
+    }
+    throw new Error(`Failed to stream message: ${response.status} ${response.statusText}`);
+  }
+
+  const reader = response.body?.getReader();
+  if (!reader) {
+    throw new Error('Streaming response is not supported in this browser.');
+  }
+
+  const decoder = new TextDecoder();
+  let buffer = '';
+
+  while (true) {
+    const { value, done } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+
+    let newlineIndex = buffer.indexOf('\n');
+    while (newlineIndex !== -1) {
+      const line = buffer.slice(0, newlineIndex).trim();
+      buffer = buffer.slice(newlineIndex + 1);
+      if (line) {
+        try {
+          yield JSON.parse(line) as ChatStreamEvent;
+        } catch (err) {
+          console.warn('Failed to parse stream event:', err);
+        }
+      }
+      newlineIndex = buffer.indexOf('\n');
+    }
+  }
+
+  const remaining = buffer.trim();
+  if (remaining) {
+    try {
+      yield JSON.parse(remaining) as ChatStreamEvent;
+    } catch (err) {
+      console.warn('Failed to parse final stream event:', err);
+    }
+  }
+}
+
+// =============================================================================
+// Experiments API
+// =============================================================================
+
+export async function listExperiments(): Promise<ExperimentListResponse> {
+  const response = await authFetch(`${BACKEND_BASE_URL}/experiments`, {
+    method: 'GET',
+  });
+
+  if (!response.ok) {
+    if (response.status === 401) {
+      throw new Error('Authentication required');
+    }
+    throw new Error(`Failed to fetch experiments: ${response.status} ${response.statusText}`);
+  }
+
+  return response.json();
+}
+
+export async function getExperiment(experimentId: string): Promise<Experiment> {
+  const response = await authFetch(`${BACKEND_BASE_URL}/experiments/${experimentId}`, {
+    method: 'GET',
+  });
+
+  if (!response.ok) {
+    if (response.status === 401) {
+      throw new Error('Authentication required');
+    }
+    throw new Error(`Failed to fetch experiment: ${response.status} ${response.statusText}`);
+  }
+
+  return response.json();
+}
+
+export async function* streamExperimentChat(
+  experimentId: string,
+  message: string,
+  history: ChatMessage[] = []
+): AsyncGenerator<ChatStreamEvent> {
+  const response = await authFetch(`${BACKEND_BASE_URL}/agent/experiments/${experimentId}/chat/stream`, {
+    method: 'POST',
+    body: JSON.stringify({ message, history }),
+  });
+
+  if (!response.ok) {
+    if (response.status === 401) {
+      throw new Error('Authentication required');
+    }
+    throw new Error(`Failed to stream message: ${response.status} ${response.statusText}`);
+  }
+
+  const reader = response.body?.getReader();
+  if (!reader) {
+    throw new Error('Streaming response is not supported in this browser.');
+  }
+
+  const decoder = new TextDecoder();
+  let buffer = '';
+
+  while (true) {
+    const { value, done } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+
+    let newlineIndex = buffer.indexOf('\n');
+    while (newlineIndex !== -1) {
+      const line = buffer.slice(0, newlineIndex).trim();
+      buffer = buffer.slice(newlineIndex + 1);
+      if (line) {
+        try {
+          yield JSON.parse(line) as ChatStreamEvent;
+        } catch (err) {
+          console.warn('Failed to parse stream event:', err);
+        }
+      }
+      newlineIndex = buffer.indexOf('\n');
+    }
+  }
+
+  const remaining = buffer.trim();
+  if (remaining) {
+    try {
+      yield JSON.parse(remaining) as ChatStreamEvent;
+    } catch (err) {
+      console.warn('Failed to parse final stream event:', err);
+    }
+  }
 }

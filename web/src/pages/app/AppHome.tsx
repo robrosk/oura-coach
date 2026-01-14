@@ -191,6 +191,36 @@ export function AppHome() {
             </svg>
           </div>
         </Link>
+
+        {/* Experiments card */}
+        <Link
+          to="/app/experiments"
+          className="bg-surface border border-border rounded-lg p-4 hover:border-accent transition-colors group"
+        >
+          <div className="flex items-center justify-between">
+            <div>
+              <h3 className="font-semibold mb-1 text-text-primary group-hover:text-accent transition-colors">
+                Experiments
+              </h3>
+              <p className="text-sm text-text-secondary">
+                Review and chat about active experiments
+              </p>
+            </div>
+            <svg
+              className="w-5 h-5 text-text-muted group-hover:text-accent transition-colors"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M9 5l7 7-7 7"
+              />
+            </svg>
+          </div>
+        </Link>
       </div>
 
       {/* Disclaimer */}
