@@ -1,6 +1,7 @@
-import { ReactNode } from 'react';
+import { ReactNode, useEffect } from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
+import { setNextPath } from '../lib/routes';
 
 interface AuthGateProps {
   children: ReactNode;
@@ -14,6 +15,13 @@ interface AuthGateProps {
 export function AuthGate({ children }: AuthGateProps) {
   const { isAuthenticated, isLoading } = useAuth();
   const location = useLocation();
+  const nextPath = `${location.pathname}${location.search}`;
+
+  useEffect(() => {
+    if (!isLoading && !isAuthenticated) {
+      setNextPath(nextPath);
+    }
+  }, [isLoading, isAuthenticated, nextPath]);
 
   // Show loading state while checking auth
   if (isLoading) {
@@ -30,7 +38,8 @@ export function AuthGate({ children }: AuthGateProps) {
   // Redirect to login if not authenticated
   if (!isAuthenticated) {
     // Preserve the intended destination
-    return <Navigate to="/login" state={{ from: location }} replace />;
+    const nextQuery = encodeURIComponent(nextPath);
+    return <Navigate to={`/login?next=${nextQuery}`} replace />;
   }
 
   return <>{children}</>;

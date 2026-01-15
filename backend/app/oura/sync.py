@@ -182,7 +182,7 @@ class SyncService:
             )
 
             # Always run cleanup after sync
-            cleanup_stats = repo.cleanup_old_events(self.db)
+            cleanup_stats = repo.cleanup_old_events(self.db, user_id=user_id)
 
             total_items = sum(counts.values())
             logger.info(
@@ -246,7 +246,7 @@ class SyncService:
             )
 
             # Always run cleanup after sync
-            cleanup_stats = repo.cleanup_old_events(self.db)
+            cleanup_stats = repo.cleanup_old_events(self.db, user_id=user_id)
 
             total_items = sum(counts.values())
             logger.info(
@@ -262,7 +262,11 @@ class SyncService:
                 cleanup_stats=cleanup_stats,
             )
 
-    def run_cleanup(self, max_days: Optional[int] = None) -> dict[str, int]:
+    def run_cleanup(
+        self,
+        user_id: Optional[str] = None,
+        max_days: Optional[int] = None,
+    ) -> dict[str, int]:
         """Run retention cleanup.
 
         Args:
@@ -271,7 +275,7 @@ class SyncService:
         Returns:
             Dict with deleted counts.
         """
-        return repo.cleanup_old_events(self.db, max_days=max_days)
+        return repo.cleanup_old_events(self.db, max_days=max_days, user_id=user_id)
 
 
 def is_sync_in_progress(user_id: str) -> bool:

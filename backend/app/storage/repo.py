@@ -1,5 +1,6 @@
 """Repository pattern for database operations."""
 
+import hashlib
 import json
 from datetime import date, datetime, timedelta
 from typing import Optional
@@ -252,16 +253,15 @@ def upsert_raw_event(
     Uses SQLite's INSERT OR REPLACE via unique constraint on
     (user_id, endpoint, record_id).
     """
-    # Check if record exists
-    existing = None
-    if record_id:
-        existing = db.execute(
-            select(OuraRawEvent).where(
-                OuraRawEvent.user_id == user_id,
-                OuraRawEvent.endpoint == endpoint,
-                OuraRawEvent.record_id == record_id,
-            )
-        ).scalar_one_or_none()
+    record_id = _derive_record_id(record_id, payload, day, start_datetime)
+
+    existing = db.execute(
+        select(OuraRawEvent).where(
+            OuraRawEvent.user_id == user_id,
+            OuraRawEvent.endpoint == endpoint,
+            OuraRawEvent.record_id == record_id,
+        )
+    ).scalar_one_or_none()
 
     payload_json = json.dumps(payload)
 
@@ -285,6 +285,31 @@ def upsert_raw_event(
         db.commit()
         db.refresh(event)
         return event
+
+
+def _derive_record_id(
+    record_id: Optional[str],
+    payload: dict,
+    day: Optional[str],
+    start_datetime: Optional[str],
+) -> str:
+    if record_id:
+        return str(record_id)
+
+    if isinstance(payload, dict):
+        payload_id = payload.get("id")
+        if payload_id:
+            return str(payload_id)
+
+    if start_datetime:
+        return f"start:{start_datetime}"
+
+    if day:
+        return f"day:{day}"
+
+    payload_json = json.dumps(payload, sort_keys=True, separators=(",", ":"))
+    payload_hash = hashlib.sha256(payload_json.encode("utf-8")).hexdigest()
+    return f"hash:{payload_hash}"
 
 
 def get_raw_events(
@@ -355,7 +380,11 @@ def count_raw_events_by_endpoint(db: Session, user_id: str) -> dict[str, int]:
     return {endpoint: count for endpoint, count in results}
 
 
-def cleanup_old_events(db: Session, max_days: Optional[int] = None) -> dict[str, int]:
+def cleanup_old_events(
+    db: Session,
+    max_days: Optional[int] = None,
+    user_id: Optional[str] = None,
+) -> dict[str, int]:
     """Delete events older than max_days.
 
     Cleans up based on both:
@@ -364,6 +393,7 @@ def cleanup_old_events(db: Session, max_days: Optional[int] = None) -> dict[str,
 
     Args:
         max_days: Maximum age in days. Defaults to config value.
+        user_id: Optional user scope. When set, only deletes that user's data.
 
     Returns:
         Dict with counts of deleted records by cleanup type.
@@ -371,22 +401,24 @@ def cleanup_old_events(db: Session, max_days: Optional[int] = None) -> dict[str,
     if max_days is None:
         max_days = settings.oura_cache_max_days
 
-    cutoff_datetime = (datetime.utcnow() - timedelta(days=max_days)).isoformat()
+    cutoff_datetime = datetime.utcnow() - timedelta(days=max_days)
     cutoff_day = (date.today() - timedelta(days=max_days)).isoformat()
 
     # Delete by fetched_at (cache age)
-    result_fetched = db.execute(
-        delete(OuraRawEvent).where(OuraRawEvent.fetched_at < cutoff_datetime)
-    )
+    fetched_query = delete(OuraRawEvent).where(OuraRawEvent.fetched_at < cutoff_datetime)
+    if user_id:
+        fetched_query = fetched_query.where(OuraRawEvent.user_id == user_id)
+    result_fetched = db.execute(fetched_query)
     deleted_by_fetched = result_fetched.rowcount
 
     # Delete by day (data age) - only for records with day field
-    result_day = db.execute(
-        delete(OuraRawEvent).where(
-            OuraRawEvent.day.isnot(None),
-            OuraRawEvent.day < cutoff_day,
-        )
+    day_query = delete(OuraRawEvent).where(
+        OuraRawEvent.day.isnot(None),
+        OuraRawEvent.day < cutoff_day,
     )
+    if user_id:
+        day_query = day_query.where(OuraRawEvent.user_id == user_id)
+    result_day = db.execute(day_query)
     deleted_by_day = result_day.rowcount
 
     db.commit()

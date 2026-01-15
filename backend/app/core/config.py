@@ -56,9 +56,13 @@ class Settings(BaseSettings):
     jwt_secret: str = "change-me-in-production-use-secure-random-string"
     jwt_algorithm: str = "HS256"
     jwt_expire_hours: int = 24
+    oauth_state_expire_minutes: int = 10
 
     # OpenAI
     openai_api_key: str = ""
+
+    # Debug
+    debug_config_enabled: bool = False
 
     model_config = {
         "env_file": _find_env_file(),

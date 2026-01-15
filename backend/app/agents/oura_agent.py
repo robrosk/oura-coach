@@ -2,11 +2,11 @@
 
 from __future__ import annotations
 
+import asyncio
 import json
 import operator
 import os
 import re
-import time
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta
 from typing import Annotated, Literal, TypedDict
@@ -220,32 +220,33 @@ def _format_pubmed_date(value: str) -> str | None:
         return None
 
 
-def _pubmed_request(
+async def _pubmed_request(
     url: str,
     params: dict,
     max_retries: int = 4,
     base_delay: float = 0.5,
 ) -> tuple[dict | None, str | None]:
-    for attempt in range(max_retries):
-        try:
-            response = httpx.get(url, params=params, timeout=12.0)
-        except httpx.RequestError:
-            response = None
-
-        if response is None:
-            pass
-        elif response.status_code == 429 or response.status_code >= 500:
-            pass
-        elif response.status_code >= 400:
-            return None, f"PubMed API error: HTTP {response.status_code}"
-        else:
+    async with httpx.AsyncClient() as client:
+        for attempt in range(max_retries):
             try:
-                return response.json(), None
-            except ValueError:
-                pass
+                response = await client.get(url, params=params, timeout=12.0)
+            except httpx.RequestError:
+                response = None
 
-        if attempt < max_retries - 1:
-            time.sleep(base_delay * (2 ** attempt))
+            if response is None:
+                pass
+            elif response.status_code == 429 or response.status_code >= 500:
+                pass
+            elif response.status_code >= 400:
+                return None, f"PubMed API error: HTTP {response.status_code}"
+            else:
+                try:
+                    return response.json(), None
+                except ValueError:
+                    pass
+
+            if attempt < max_retries - 1:
+                await asyncio.sleep(base_delay * (2 ** attempt))
 
     return None, "PubMed API is cooling down, try again later."
 
@@ -405,19 +406,20 @@ def _make_oura_tools(db, user_id: str):
         })
 
     @tool
-    def web_fetch(url: str, max_chars: int = 4000) -> str:
+    async def web_fetch(url: str, max_chars: int = 4000) -> str:
         """Fetch and extract text from a public web page URL."""
         parsed = urlparse(url)
         if parsed.scheme not in {"http", "https"}:
             return json.dumps({"error": "Only http/https URLs are supported."})
 
         try:
-            response = httpx.get(
-                url,
-                timeout=15.0,
-                follow_redirects=True,
-                headers={"User-Agent": "OuraCoachBot/1.0"},
-            )
+            async with httpx.AsyncClient() as client:
+                response = await client.get(
+                    url,
+                    timeout=15.0,
+                    follow_redirects=True,
+                    headers={"User-Agent": "OuraCoachBot/1.0"},
+                )
         except httpx.RequestError as exc:
             return json.dumps({"error": f"Request failed: {exc}"})
 
@@ -468,7 +470,7 @@ def _make_oura_tools(db, user_id: str):
         return json.dumps({"query": query, "results": results})
 
     @tool
-    def pubmed_search(
+    async def pubmed_search(
         query: str,
         max_results: int = 5,
         sort: str | None = "relevance",
@@ -509,7 +511,7 @@ def _make_oura_tools(db, user_id: str):
             params["email"] = email
         params["tool"] = os.getenv("NCBI_TOOL", "oura_agent")
 
-        search_data, error = _pubmed_request(
+        search_data, error = await _pubmed_request(
             "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi",
             params,
         )
@@ -538,7 +540,7 @@ def _make_oura_tools(db, user_id: str):
             summary_params["email"] = email
         summary_params["tool"] = params["tool"]
 
-        summary_data, summary_error = _pubmed_request(
+        summary_data, summary_error = await _pubmed_request(
             "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esummary.fcgi",
             summary_params,
         )
@@ -604,7 +606,7 @@ def _build_graph(model: ChatOpenAI, tools_by_name: dict[str, object], system_pro
             "llm_calls": state.get("llm_calls", 0) + 1,
         }
 
-    def tool_node(state: AgentState) -> dict:
+    async def tool_node(state: AgentState) -> dict:
         results: list[ToolMessage] = []
         last_message = state["messages"][-1]
         tool_calls = getattr(last_message, "tool_calls", None)
@@ -623,7 +625,7 @@ def _build_graph(model: ChatOpenAI, tools_by_name: dict[str, object], system_pro
                 )
                 continue
 
-            observation = tool_instance.invoke(tool_call.get("args", {}))
+            observation = await tool_instance.ainvoke(tool_call.get("args", {}))
             if not isinstance(observation, str):
                 observation = json.dumps(observation)
             results.append(

@@ -81,7 +81,7 @@ async def run_backfill(
         # Optional cleanup
         if cleanup_first:
             logger.info(f"Running cleanup (max {settings.oura_cache_max_days} days)...")
-            result = repo.cleanup_old_events(db)
+            result = repo.cleanup_old_events(db, user_id=user.id)
             logger.info(f"Cleanup: deleted {result['total_deleted']} records")
 
         # Create client

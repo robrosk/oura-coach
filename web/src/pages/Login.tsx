@@ -1,16 +1,23 @@
-import { useState } from 'react';
-import { Link, useLocation } from 'react-router-dom';
+import { useEffect, useState } from 'react';
+import { Link, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
+import { readNextFromQuery, setNextPath } from '../lib/routes';
 
 export function Login() {
   const { login, isAuthenticated } = useAuth();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const location = useLocation();
+  const [searchParams] = useSearchParams();
 
   // Get error from URL params (from OAuth callback)
-  const urlParams = new URLSearchParams(location.search);
-  const urlError = urlParams.get('error');
+  const urlError = searchParams.get('error');
+  const nextParam = readNextFromQuery(searchParams.get('next'));
+
+  useEffect(() => {
+    if (nextParam) {
+      setNextPath(nextParam);
+    }
+  }, [nextParam]);
 
   // If already authenticated, show redirect message
   if (isAuthenticated) {

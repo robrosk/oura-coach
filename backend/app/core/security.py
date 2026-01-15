@@ -80,3 +80,46 @@ def get_token_expiry(token: str) -> Optional[datetime]:
         return None
     except jwt.InvalidTokenError:
         return None
+
+
+def create_oauth_state(payload: dict, expires_minutes: Optional[int] = None) -> str:
+    """Create a signed, expiring OAuth state token.
+
+    Args:
+        payload: Extra fields to include (e.g., purpose, user_id).
+        expires_minutes: Override expiry window in minutes.
+
+    Returns:
+        Encoded state token.
+    """
+    expire = datetime.utcnow() + timedelta(
+        minutes=expires_minutes or settings.oauth_state_expire_minutes
+    )
+    token_payload = {
+        **payload,
+        "typ": "oauth_state",
+        "exp": expire,
+        "iat": datetime.utcnow(),
+    }
+    return jwt.encode(token_payload, settings.jwt_secret, algorithm=settings.jwt_algorithm)
+
+
+def decode_oauth_state(token: str) -> Optional[dict]:
+    """Decode and validate an OAuth state token."""
+    try:
+        payload = jwt.decode(
+            token,
+            settings.jwt_secret,
+            algorithms=[settings.jwt_algorithm],
+        )
+    except jwt.ExpiredSignatureError:
+        logger.debug("OAuth state token expired")
+        return None
+    except jwt.InvalidTokenError as e:
+        logger.debug(f"Invalid OAuth state token: {e}")
+        return None
+
+    if payload.get("typ") != "oauth_state":
+        return None
+
+    return payload

@@ -1,11 +1,11 @@
 import { useEffect, useState } from 'react';
-import { useNavigate, useSearchParams, useLocation } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
+import { clearNextPath, getNextPath, readNextFromQuery } from '../lib/routes';
 
 export function LoginCallback() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
-  const location = useLocation();
   const { setAuthFromCallback } = useAuth();
   const [error, setError] = useState<string | null>(null);
 
@@ -13,10 +13,14 @@ export function LoginCallback() {
     const handleCallback = async () => {
       const token = searchParams.get('token');
       const errorParam = searchParams.get('error');
+      const nextParam = readNextFromQuery(searchParams.get('next'));
+      const storedNext = getNextPath();
+      const fallbackNext = nextParam || storedNext;
 
       if (errorParam) {
         // Redirect to login with error
-        navigate(`/login?error=${errorParam}`, { replace: true });
+        const nextQuery = fallbackNext ? `&next=${encodeURIComponent(fallbackNext)}` : '';
+        navigate(`/login?error=${errorParam}${nextQuery}`, { replace: true });
         return;
       }
 
@@ -28,9 +32,10 @@ export function LoginCallback() {
       try {
         await setAuthFromCallback(token);
 
-        // Get the intended destination from location state, or default to /app
-        const from = (location.state as { from?: { pathname: string } })?.from?.pathname || '/app';
-        navigate(from, { replace: true });
+        // Get the intended destination from query or storage, or default to /app
+        const destination = fallbackNext || '/app';
+        clearNextPath();
+        navigate(destination, { replace: true });
       } catch (err) {
         console.error('Failed to complete login:', err);
         setError(err instanceof Error ? err.message : 'Failed to complete login');
@@ -38,7 +43,7 @@ export function LoginCallback() {
     };
 
     handleCallback();
-  }, [searchParams, navigate, setAuthFromCallback, location.state]);
+  }, [searchParams, navigate, setAuthFromCallback]);
 
   if (error) {
     return (

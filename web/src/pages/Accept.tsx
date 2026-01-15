@@ -1,14 +1,16 @@
 import { useState } from 'react';
-import { useNavigate, useLocation, Link } from 'react-router-dom';
+import { useNavigate, useSearchParams, Link } from 'react-router-dom';
 import { ScrollableTerms } from '../components/ScrollableTerms';
 import { setTermsAcceptance } from '../lib/storage';
 import { CURRENT_TERMS_VERSION } from '../lib/terms';
+import { clearNextPath, getNextPath, readNextFromQuery } from '../lib/routes';
 import termsContent from '../content/terms.md?raw';
 
 export function Accept() {
   const navigate = useNavigate();
-  const location = useLocation();
-  const from = (location.state as { from?: string })?.from || '/app';
+  const [searchParams] = useSearchParams();
+  const from =
+    readNextFromQuery(searchParams.get('next')) || getNextPath() || '/app';
 
   const [hasScrolledToBottom, setHasScrolledToBottom] = useState(false);
   const [termsChecked, setTermsChecked] = useState(false);
@@ -19,6 +21,7 @@ export function Accept() {
   const handleAccept = () => {
     if (!canContinue) return;
     setTermsAcceptance(CURRENT_TERMS_VERSION);
+    clearNextPath();
     navigate(from, { replace: true });
   };
 

@@ -74,13 +74,13 @@ uvicorn app.main:app --reload
 ### Data Sync
 - `POST /oura/sync/backfill?days=60` - Full backfill (heavy), runs in background
 - `POST /oura/sync/refresh?days=7` - Light refresh, runs in background
-- `POST /oura/sync/cleanup` - Run retention cleanup (60-day cap)
+- `POST /oura/sync/cleanup` - Run retention cleanup (60-day cap, scoped to current user)
 - `GET /oura/cache/summary` - Cache summary with counts and date ranges
 
 ### Data Access
 - `GET /oura/backfill?days=60` - Legacy: Fetch and cache Oura data (synchronous)
 - `GET /oura/raw?endpoint=daily_sleep&days=14` - Get cached data
-- `POST /oura/cleanup` - Run retention cleanup
+- `POST /oura/cleanup` - Run retention cleanup (scoped to current user)
 - `GET /oura/status` - Connection status and data summary
 
 ## CLI Backfill Script
@@ -168,19 +168,40 @@ When enabled, the scheduler runs a refresh every N hours to keep data fresh.
 
 ```bash
 # Trigger backfill (60 days)
-curl -X POST http://localhost:8000/oura/sync/backfill
+curl -X POST http://localhost:8000/oura/sync/backfill \
+  -H "Authorization: Bearer <token>"
 
 # Trigger refresh (7 days)
-curl -X POST http://localhost:8000/oura/sync/refresh
+curl -X POST http://localhost:8000/oura/sync/refresh \
+  -H "Authorization: Bearer <token>"
 
 # Custom days
-curl -X POST "http://localhost:8000/oura/sync/backfill?days=30"
+curl -X POST "http://localhost:8000/oura/sync/backfill?days=30" \
+  -H "Authorization: Bearer <token>"
 
 # Check cache summary
-curl http://localhost:8000/oura/cache/summary
+curl http://localhost:8000/oura/cache/summary \
+  -H "Authorization: Bearer <token>"
 
 # Run cleanup
-curl -X POST http://localhost:8000/oura/sync/cleanup
+curl -X POST http://localhost:8000/oura/sync/cleanup \
+  -H "Authorization: Bearer <token>"
+```
+
+## Debug Config Endpoint
+
+`/debug/config` is disabled by default. Enable it only for local debugging:
+
+```bash
+DEBUG_CONFIG_ENABLED=true
+```
+
+## Docker Development Note
+
+To wipe the SQLite database on container start (dev only):
+
+```bash
+CLEAR_DB_ON_STARTUP=true
 ```
 
 ### Concurrency Protection

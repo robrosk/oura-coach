@@ -81,6 +81,7 @@ web/
 │   │   └── terms.md
 │   ├── lib/               # Utilities
 │   │   ├── api.ts         # Backend API client
+│   │   ├── routes.ts      # Redirect helpers (next path)
 │   │   ├── storage.ts     # localStorage helpers
 │   │   └── terms.ts       # Terms version management
 │   ├── pages/             # Route pages
@@ -139,6 +140,9 @@ The `/accept` page requires users to:
 3. Check "I have read the Privacy Policy"
 
 Only then can they continue to the app.
+
+If the user was redirected into `/accept`, a `next` query param and sessionStorage
+are used to return them to the intended `/app/*` route after acceptance.
 
 Acceptance is stored in localStorage with:
 - `termsAccepted: true`

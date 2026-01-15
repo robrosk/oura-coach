@@ -4,17 +4,18 @@ import json
 from datetime import date, timedelta
 from typing import Optional
 
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, Request
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query
 from fastapi.responses import RedirectResponse
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from ..core.config import get_settings
 from ..core.logging import logger
+from ..core.security import create_oauth_state, decode_oauth_state
 from ..oura import oauth
 from ..oura.client import OuraAPIError, OuraClient
 from ..oura.endpoints import BACKFILL_ENDPOINTS, get_endpoint_config
-from ..oura.sync import SyncService, SyncResult, is_sync_in_progress
+from ..oura.sync import SyncService, is_sync_in_progress
 from ..storage import repo
 from ..storage.db import get_db, SessionLocal
 from ..storage.models import User
@@ -22,10 +23,6 @@ from .deps import get_current_user
 
 settings = get_settings()
 router = APIRouter(prefix="/oura", tags=["oura"])
-
-# In-memory state storage for CSRF (MVP - use Redis in production)
-# Maps state token -> user_id for OAuth callback
-_oauth_states: dict[str, str] = {}
 
 
 # =============================================================================
@@ -129,9 +126,9 @@ async def start_oauth_flow(
     Requires authentication. Returns auth URL for the client to redirect to.
     The user's ID is stored with the state for the callback.
     """
-    auth_url, state = oauth.generate_auth_url()
-    _oauth_states[state] = user.id  # Store user_id for callback
-    logger.info(f"Generated OAuth URL for user {user.id} with state: {state[:8]}...")
+    state = create_oauth_state({"purpose": "oura", "user_id": user.id})
+    auth_url, _ = oauth.generate_auth_url(state)
+    logger.info(f"Generated OAuth URL for user {user.id} with signed state")
     return AuthUrlResponse(auth_url=auth_url, state=state)
 
 
@@ -162,13 +159,15 @@ async def oauth_callback(
         raise HTTPException(status_code=400, detail="Missing code or state parameter")
 
     # CSRF validation and get user_id
-    if state not in _oauth_states:
-        logger.warning(f"Invalid OAuth state: {state[:8]}...")
+    state_payload = decode_oauth_state(state)
+    if not state_payload or state_payload.get("purpose") != "oura":
+        logger.warning("Invalid OAuth state")
         raise HTTPException(status_code=400, detail="Invalid state parameter")
 
-    # Get user_id and clean up state
-    user_id = _oauth_states[state]
-    del _oauth_states[state]
+    user_id = state_payload.get("user_id")
+    if not user_id:
+        logger.warning("OAuth state missing user_id")
+        raise HTTPException(status_code=400, detail="Invalid state parameter")
 
     # Verify user exists
     user = repo.get_user_by_id(db, user_id)
@@ -366,6 +365,7 @@ async def get_raw_data(
 @router.post("/cleanup", response_model=CleanupResponse)
 async def cleanup_old_data(
     max_days: int = Query(default=None, ge=1, le=365),
+    user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
     """Run retention cleanup to delete old cached data.
@@ -374,7 +374,7 @@ async def cleanup_old_data(
     - fetched_at: when we cached the data
     - day: the actual data date (for daily summaries)
     """
-    result = repo.cleanup_old_events(db, max_days=max_days)
+    result = repo.cleanup_old_events(db, max_days=max_days, user_id=user.id)
     return CleanupResponse(**result)
 
 
@@ -505,6 +505,7 @@ async def sync_refresh(
 @router.post("/sync/cleanup", response_model=CleanupResponse)
 async def sync_cleanup(
     max_days: int = Query(default=None, ge=1, le=365, description="Max age in days (default: 60)"),
+    user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
     """Run retention cleanup to delete old cached data.
@@ -512,7 +513,7 @@ async def sync_cleanup(
     Enforces the 60-day retention cap as required by Oura API Agreement.
     """
     sync_service = SyncService(db)
-    result = sync_service.run_cleanup(max_days=max_days)
+    result = sync_service.run_cleanup(user_id=user.id, max_days=max_days)
     return CleanupResponse(**result)
 
 

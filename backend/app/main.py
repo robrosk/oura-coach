@@ -3,7 +3,7 @@
 from contextlib import asynccontextmanager
 from typing import Optional
 
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 
 from .api.routes_agent import router as agent_router
@@ -183,15 +183,13 @@ async def health():
 @app.get("/debug/config")
 async def debug_config():
     """Debug endpoint to check configuration status (no secrets exposed)."""
-    from pathlib import Path
-
-    env_path = Path(__file__).parent.parent / ".env"
+    if not settings.debug_config_enabled:
+        raise HTTPException(status_code=404, detail="Not found")
 
     return {
         "google_oauth": {
             "configured": bool(settings.google_client_id and settings.google_client_secret),
             "client_id_set": bool(settings.google_client_id),
-            "client_id_preview": settings.google_client_id[:20] + "..." if settings.google_client_id else None,
             "client_secret_set": bool(settings.google_client_secret),
             "redirect_uri": settings.google_redirect_uri,
         },
@@ -208,8 +206,7 @@ async def debug_config():
         "database": {
             "url": settings.database_url,
         },
-        "env_file": {
-            "expected_path": str(Path(__file__).parent.parent.parent / ".env"),
-            "exists": (Path(__file__).parent.parent.parent / ".env").exists(),
+        "web": {
+            "web_app_url": settings.web_app_url,
         },
     }

@@ -28,18 +28,21 @@ export function computeStats(items: OuraDailyRecord[]): MetricStats {
  * Get the Monday of the week for a given date
  */
 function getWeekStart(dateStr: string): string {
-  const date = new Date(dateStr);
+  const date = parseYmd(dateStr);
+  if (!date) return dateStr;
   const day = date.getDay();
   const diff = date.getDate() - day + (day === 0 ? -6 : 1); // Adjust for Sunday
-  const monday = new Date(date.setDate(diff));
-  return monday.toISOString().split('T')[0];
+  const monday = new Date(date);
+  monday.setDate(diff);
+  return formatYmd(monday);
 }
 
 /**
  * Format a week range label (e.g., "Dec 30 - Jan 5")
  */
 function formatWeekLabel(weekStart: string): string {
-  const start = new Date(weekStart);
+  const start = parseYmd(weekStart);
+  if (!start) return weekStart;
   const end = new Date(start);
   end.setDate(end.getDate() + 6);
 
@@ -111,7 +114,8 @@ export function getScoreBgColor(score: number): string {
  * Format a date string for display (e.g., "Jan 4, 2026")
  */
 export function formatDate(dateStr: string): string {
-  const date = new Date(dateStr);
+  const date = parseYmd(dateStr);
+  if (!date) return dateStr;
   return date.toLocaleDateString('en-US', {
     month: 'short',
     day: 'numeric',
@@ -123,9 +127,27 @@ export function formatDate(dateStr: string): string {
  * Format a date string for short display (e.g., "Jan 4")
  */
 export function formatDateShort(dateStr: string): string {
-  const date = new Date(dateStr);
+  const date = parseYmd(dateStr);
+  if (!date) return dateStr;
   return date.toLocaleDateString('en-US', {
     month: 'short',
     day: 'numeric',
   });
+}
+
+function parseYmd(dateStr: string): Date | null {
+  const parts = dateStr.split('-').map((value) => Number(value));
+  if (parts.length !== 3) return null;
+  const [year, month, day] = parts;
+  if (!year || !month || !day) return null;
+  const date = new Date(year, month - 1, day);
+  if (Number.isNaN(date.getTime())) return null;
+  return date;
+}
+
+function formatYmd(date: Date): string {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
 }

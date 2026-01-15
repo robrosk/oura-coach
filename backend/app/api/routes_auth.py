@@ -1,6 +1,5 @@
 """Authentication routes for Google OAuth."""
 
-import secrets
 from typing import Optional
 from urllib.parse import urlencode
 
@@ -12,7 +11,7 @@ from sqlalchemy.orm import Session
 
 from ..core.config import get_settings
 from ..core.logging import logger
-from ..core.security import create_jwt_token
+from ..core.security import create_jwt_token, create_oauth_state, decode_oauth_state
 from ..storage.db import get_db
 from ..storage import repo
 from ..storage.models import User
@@ -20,9 +19,6 @@ from .deps import get_current_user
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 settings = get_settings()
-
-# In-memory state storage for CSRF (MVP - use Redis in production)
-_oauth_states: dict[str, str] = {}
 
 # Google OAuth URLs
 GOOGLE_AUTH_URL = "https://accounts.google.com/o/oauth2/v2/auth"
@@ -72,9 +68,8 @@ async def start_google_oauth():
             detail="Google OAuth not configured. Set GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET.",
         )
 
-    # Generate state token for CSRF protection
-    state = secrets.token_urlsafe(32)
-    _oauth_states[state] = state
+    # Signed, expiring state token for CSRF protection
+    state = create_oauth_state({"purpose": "google"})
 
     # Build authorization URL
     params = {
@@ -116,12 +111,10 @@ async def google_oauth_callback(
         return RedirectResponse(f"{settings.web_app_url}/login?error=missing_params")
 
     # Validate state (CSRF protection)
-    if state not in _oauth_states:
+    state_payload = decode_oauth_state(state)
+    if not state_payload or state_payload.get("purpose") != "google":
         logger.error("Invalid OAuth state")
         return RedirectResponse(f"{settings.web_app_url}/login?error=invalid_state")
-
-    # Remove used state
-    del _oauth_states[state]
 
     try:
         # Exchange code for tokens
