@@ -10,6 +10,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 from ..agents import AgentContext, ChatMessage, ExperimentAgent, OuraAgent
+from ..agents.oura_agent import SYSTEM_PROMPT
 from ..storage.models import User
 from ..storage.db import get_db
 from .deps import get_current_user
@@ -25,6 +26,7 @@ class ChatMessagePayload(BaseModel):
 class ChatRequest(BaseModel):
     message: str = Field(min_length=1)
     history: list[ChatMessagePayload] = Field(default_factory=list)
+    requested_tool: Literal["web_search", "pubmed_search"] | None = None
 
 
 class ToolCallPayload(BaseModel):
@@ -38,6 +40,29 @@ class ChatResponse(BaseModel):
     tool_calls: list[ToolCallPayload] = Field(default_factory=list)
 
 
+REQUESTED_TOOL_INSTRUCTIONS: dict[str, str] = {
+    "web_search": (
+        "The user requested web search. You MUST call the web_search tool before "
+        "answering. Formulate the best search query based on the user's latest message, "
+        "then summarize the findings with sources."
+    ),
+    "pubmed_search": (
+        "The user requested PubMed search. You MUST call the pubmed_search tool before "
+        "answering. Formulate the best search query based on the user's latest message, "
+        "then summarize the findings with sources."
+    ),
+}
+
+
+def _build_requested_prompt(requested_tool: str | None) -> str | None:
+    if not requested_tool:
+        return None
+    instruction = REQUESTED_TOOL_INSTRUCTIONS.get(requested_tool)
+    if not instruction:
+        return None
+    return f"{SYSTEM_PROMPT}\n\n{instruction}"
+
+
 @router.post("/chat", response_model=ChatResponse)
 async def chat_with_agent(
     request: ChatRequest,
@@ -45,7 +70,12 @@ async def chat_with_agent(
     db: Session = Depends(get_db),
 ):
     try:
-        agent = OuraAgent(db=db, model="gpt-5-mini", user_id=user.id)
+        agent = OuraAgent(
+            db=db,
+            model="gpt-5-mini",
+            user_id=user.id,
+            system_prompt=_build_requested_prompt(request.requested_tool),
+        )
     except RuntimeError as exc:
         raise HTTPException(status_code=500, detail=str(exc))
 
@@ -66,7 +96,12 @@ async def chat_with_agent_stream(
     db: Session = Depends(get_db),
 ):
     try:
-        agent = OuraAgent(db=db, model="gpt-5-mini", user_id=user.id)
+        agent = OuraAgent(
+            db=db,
+            model="gpt-5-mini",
+            user_id=user.id,
+            system_prompt=_build_requested_prompt(request.requested_tool),
+        )
     except RuntimeError as exc:
         raise HTTPException(status_code=500, detail=str(exc))
 

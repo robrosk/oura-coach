@@ -7,6 +7,7 @@ import type {
   ChatMessage,
   ChatResponse,
   ChatStreamEvent,
+  RequestedTool,
   Experiment,
   ExperimentListResponse,
 } from '../types';
@@ -168,11 +169,16 @@ export async function disconnectOura(): Promise<{ success: boolean; message: str
  */
 export async function sendChatMessage(
   message: string,
-  history: ChatMessage[] = []
+  history: ChatMessage[] = [],
+  requestedTool?: RequestedTool
 ): Promise<ChatResponse> {
+  const payload: Record<string, unknown> = { message, history };
+  if (requestedTool) {
+    payload.requested_tool = requestedTool;
+  }
   const response = await authFetch(`${BACKEND_BASE_URL}/agent/chat`, {
     method: 'POST',
-    body: JSON.stringify({ message, history }),
+    body: JSON.stringify(payload),
   });
 
   if (!response.ok) {
@@ -190,11 +196,16 @@ export async function sendChatMessage(
  */
 export async function* streamChatMessage(
   message: string,
-  history: ChatMessage[] = []
+  history: ChatMessage[] = [],
+  requestedTool?: RequestedTool
 ): AsyncGenerator<ChatStreamEvent> {
+  const payload: Record<string, unknown> = { message, history };
+  if (requestedTool) {
+    payload.requested_tool = requestedTool;
+  }
   const response = await authFetch(`${BACKEND_BASE_URL}/agent/chat/stream`, {
     method: 'POST',
-    body: JSON.stringify({ message, history }),
+    body: JSON.stringify(payload),
   });
 
   if (!response.ok) {

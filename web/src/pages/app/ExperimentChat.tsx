@@ -119,6 +119,26 @@ const DEFAULT_TOOL_STYLE = {
   borderStyle: 'border-dashed',
 };
 
+const EXPERIMENT_STATUS_STYLES: Record<
+  string,
+  { badge: string; text: string; dot: string }
+> = {
+  active: { badge: 'bg-success/15 text-success', text: 'Active', dot: 'bg-success' },
+  ended: { badge: 'bg-surface-elevated text-text-secondary', text: 'Ended', dot: 'bg-text-muted' },
+  success: { badge: 'bg-success/20 text-success', text: 'Success', dot: 'bg-success' },
+  failure: { badge: 'bg-error/15 text-error', text: 'Failed', dot: 'bg-error' },
+};
+
+function getExperimentStatus(status: string) {
+  return (
+    EXPERIMENT_STATUS_STYLES[status] || {
+      badge: 'bg-surface-elevated text-text-secondary',
+      text: status,
+      dot: 'bg-text-muted',
+    }
+  );
+}
+
 type ChatItem =
   | {
       id: string;
@@ -168,46 +188,59 @@ function formatArgs(tool: ToolCall): string {
 }
 
 function renderExperimentMeta(experiment: Experiment) {
+  const status = getExperimentStatus(experiment.status);
   return (
-    <div className="bg-surface border border-border rounded-lg p-5 mb-6">
-      <div className="flex items-start justify-between gap-4">
-        <div>
-          <h1 className="text-2xl md:text-3xl font-bold text-text-primary">
-            {experiment.title}
-          </h1>
-          <p className="text-text-secondary mt-1">{experiment.objective}</p>
-          <p className="text-xs text-text-muted mt-2">
-            {experiment.start_date} to {experiment.end_date} · {experiment.duration_days} days
-          </p>
+    <div className="bg-surface border border-border rounded-xl p-6 mb-6">
+      <div className="flex flex-col gap-5">
+        <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
+          <div>
+            <p className="text-xs uppercase tracking-wide text-text-muted">Experiment</p>
+            <h1 className="text-2xl md:text-3xl font-bold text-text-primary mt-2">
+              {experiment.title}
+            </h1>
+            <p className="text-text-secondary mt-2">{experiment.objective}</p>
+          </div>
+          <span className={`inline-flex items-center gap-2 text-xs font-semibold px-3 py-1 rounded-full ${status.badge}`}>
+            <span className={`h-2 w-2 rounded-full ${status.dot}`} />
+            {status.text}
+          </span>
         </div>
-        <span className="text-xs font-semibold px-3 py-1 rounded-full bg-surface-elevated text-text-secondary">
-          {experiment.status}
-        </span>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-sm">
+          <div className="bg-surface-elevated rounded-lg p-3">
+            <p className="text-xs uppercase tracking-wide text-text-muted mb-1">Timeline</p>
+            <p className="text-text-primary">
+              {experiment.start_date} → {experiment.end_date}
+            </p>
+            <p className="text-xs text-text-muted">{experiment.duration_days} days</p>
+          </div>
+          <div className="bg-surface-elevated rounded-lg p-3">
+            <p className="text-xs uppercase tracking-wide text-text-muted mb-1">Success</p>
+            <p className="text-text-secondary">{experiment.success_criteria}</p>
+          </div>
+          <div className="bg-surface-elevated rounded-lg p-3">
+            <p className="text-xs uppercase tracking-wide text-text-muted mb-1">Hypothesis</p>
+            <p className="text-text-secondary">{experiment.hypothesis}</p>
+          </div>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
+          <div className="bg-surface-elevated rounded-lg p-3">
+            <p className="text-xs uppercase tracking-wide text-text-muted mb-1">Protocol</p>
+            <p className="text-text-secondary">{experiment.protocol}</p>
+          </div>
+          <div className="bg-surface-elevated rounded-lg p-3">
+            <p className="text-xs uppercase tracking-wide text-text-muted mb-1">Metrics</p>
+            <p className="text-text-secondary">
+              {experiment.metrics.length ? experiment.metrics.join(', ') : 'Not specified'}
+            </p>
+          </div>
+        </div>
+        {experiment.outcome && (
+          <div className="bg-surface-elevated rounded-lg p-3 text-sm">
+            <p className="text-xs uppercase tracking-wide text-text-muted mb-1">Outcome</p>
+            <p className="text-text-secondary">{experiment.outcome}</p>
+          </div>
+        )}
       </div>
-      <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4 text-sm text-text-secondary">
-        <div>
-          <p className="text-xs uppercase tracking-wide text-text-muted mb-1">Hypothesis</p>
-          <p>{experiment.hypothesis}</p>
-        </div>
-        <div>
-          <p className="text-xs uppercase tracking-wide text-text-muted mb-1">Success Criteria</p>
-          <p>{experiment.success_criteria}</p>
-        </div>
-        <div>
-          <p className="text-xs uppercase tracking-wide text-text-muted mb-1">Protocol</p>
-          <p>{experiment.protocol}</p>
-        </div>
-        <div>
-          <p className="text-xs uppercase tracking-wide text-text-muted mb-1">Metrics</p>
-          <p>{experiment.metrics.length ? experiment.metrics.join(', ') : 'Not specified'}</p>
-        </div>
-      </div>
-      {experiment.outcome && (
-        <div className="mt-4 text-sm text-text-secondary">
-          <p className="text-xs uppercase tracking-wide text-text-muted mb-1">Outcome</p>
-          <p>{experiment.outcome}</p>
-        </div>
-      )}
     </div>
   );
 }

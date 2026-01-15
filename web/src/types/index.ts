@@ -31,6 +31,8 @@ export interface ChatResponse {
   tool_calls?: ToolCall[];
 }
 
+export type RequestedTool = 'web_search' | 'pubmed_search';
+
 export interface Experiment {
   id: string;
   title: string;

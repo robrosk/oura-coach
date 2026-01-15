@@ -5,7 +5,7 @@ import remarkMath from 'remark-math';
 import rehypeKatex from 'rehype-katex';
 import 'katex/dist/katex.min.css';
 import { streamChatMessage } from '../../lib/api';
-import type { ChatMessage, ToolCall } from '../../types';
+import type { ChatMessage, RequestedTool, ToolCall } from '../../types';
 
 const STARTER_MESSAGE: ChatMessage = {
   role: 'assistant',
@@ -96,6 +96,29 @@ const DEFAULT_TOOL_STYLE = {
   borderStyle: 'border-dashed',
 };
 
+const GlobeIcon = ({ className }: { className?: string }) => (
+  <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <path
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      strokeWidth={2}
+      d="M12 3c4.97 0 9 4.03 9 9s-4.03 9-9 9-9-4.03-9-9 4.03-9 9-9zm0 0c2.76 0 5 4.03 5 9s-2.24 9-5 9-5-4.03-5-9 2.24-9 5-9zm-9 9h18"
+    />
+  </svg>
+);
+
+const BookIcon = ({ className }: { className?: string }) => (
+  <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <path
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      strokeWidth={2}
+      d="M4 5.5C4 4.12 5.12 3 6.5 3H19a1 1 0 011 1v15a1 1 0 01-1 1H6.5C5.12 20 4 18.88 4 17.5V5.5z"
+    />
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 3v18" />
+  </svg>
+);
+
 type ChatItem =
   | {
       id: string;
@@ -157,6 +180,7 @@ export function Chat() {
   const [input, setInput] = useState('');
   const [isSending, setIsSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [requestedTool, setRequestedTool] = useState<RequestedTool | null>(null);
   const endRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
@@ -168,6 +192,7 @@ export function Chat() {
     if (!trimmed || isSending) return;
 
     const priorHistory = history;
+    const selectedTool = requestedTool;
     const userMessage: ChatMessage = { role: 'user', content: trimmed };
     const userItem: ChatItem = {
       id: createId(),
@@ -187,6 +212,7 @@ export function Chat() {
     setItems((prev) => [...prev, userItem, assistantItem]);
     setHistory((prev) => [...prev, userMessage]);
     setInput('');
+    setRequestedTool(null);
     setIsSending(true);
     setError(null);
 
@@ -218,7 +244,7 @@ export function Chat() {
     };
 
     try {
-      for await (const event of streamChatMessage(trimmed, priorHistory)) {
+      for await (const event of streamChatMessage(trimmed, priorHistory, selectedTool || undefined)) {
         if (event.type === 'tool_start') {
           sawToolEvents = true;
           if (assistantPresent && !hasToken) {
@@ -334,6 +360,10 @@ export function Chat() {
       event.preventDefault();
       void submitMessage();
     }
+  };
+
+  const toggleRequestedTool = (tool: RequestedTool) => {
+    setRequestedTool((current) => (current === tool ? null : tool));
   };
 
   return (
@@ -469,6 +499,39 @@ export function Chat() {
           rows={2}
           className="w-full rounded-lg border border-border bg-surface-elevated px-4 py-3 text-sm text-text-primary placeholder:text-text-muted focus:border-accent"
         />
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-xs text-text-muted">Tool preference:</span>
+          <button
+            type="button"
+            onClick={() => toggleRequestedTool('web_search')}
+            disabled={isSending}
+            className={`inline-flex items-center gap-2 rounded-full border px-3 py-2 text-xs font-semibold transition-colors ${
+              isSending
+                ? 'border-border text-text-muted cursor-not-allowed'
+                : requestedTool === 'web_search'
+                ? 'border-accent/60 bg-accent/15 text-accent'
+                : 'border-border text-text-secondary hover:text-text-primary hover:bg-surface-elevated'
+            }`}
+          >
+            <GlobeIcon className="h-4 w-4" />
+            Web search
+          </button>
+          <button
+            type="button"
+            onClick={() => toggleRequestedTool('pubmed_search')}
+            disabled={isSending}
+            className={`inline-flex items-center gap-2 rounded-full border px-3 py-2 text-xs font-semibold transition-colors ${
+              isSending
+                ? 'border-border text-text-muted cursor-not-allowed'
+                : requestedTool === 'pubmed_search'
+                ? 'border-success/50 bg-success/10 text-success'
+                : 'border-border text-text-secondary hover:text-text-primary hover:bg-surface-elevated'
+            }`}
+          >
+            <BookIcon className="h-4 w-4" />
+            PubMed
+          </button>
+        </div>
         <div className="flex items-center justify-between gap-3">
           <p className="text-xs text-text-muted">
             Oura Coach provides non-medical wellness guidance only.
